@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { UseRedirectTimerOptions, UseRedirectTimerReturn } from "@/types/redirect-loader";
+import { normalizeRedirectUrl } from "@/utils/url";
 
 /**
  * Custom hook to handle countdown and redirection logic.
- * Uses real timestamp delta to prevent background tab interval drift.
+ * Safely resolves URLs to prevent 404 errors (e.g. converting 'google.com' to 'https://google.com').
+ * Uses timestamp deltas to prevent background tab interval drift.
  */
 export function useRedirectTimer({
   targetUrl,
@@ -16,7 +18,10 @@ export function useRedirectTimer({
   onCancel,
 }: UseRedirectTimerOptions): UseRedirectTimerReturn {
   const router = useRouter();
-  const totalDurationMs = durationInSeconds * 1000;
+  const totalDurationMs = Math.max(1, durationInSeconds) * 1000;
+
+  // Normalize URL upfront
+  const normalized = useMemo(() => normalizeRedirectUrl(targetUrl), [targetUrl]);
 
   const [remainingMs, setRemainingMs] = useState<number>(totalDurationMs);
   const [isRunning, setIsRunning] = useState<boolean>(autoStart);
@@ -24,12 +29,15 @@ export function useRedirectTimer({
   const [isCancelled, setIsCancelled] = useState<boolean>(false);
   const [isRedirecting, setIsRedirecting] = useState<boolean>(false);
 
-  const remainingMsRef = useRef<number>(remainingMs);
-  remainingMsRef.current = remainingMs;
-
   const lastTimestampRef = useRef<number | null>(null);
   const intervalIdRef = useRef<NodeJS.Timeout | null>(null);
   const hasRedirectedRef = useRef<boolean>(false);
+
+  // Sync remaining time if duration changes
+  useEffect(() => {
+    setRemainingMs(totalDurationMs);
+    hasRedirectedRef.current = false;
+  }, [totalDurationMs]);
 
   const executeRedirect = useCallback(() => {
     if (hasRedirectedRef.current) return;
@@ -43,19 +51,17 @@ export function useRedirectTimer({
       intervalIdRef.current = null;
     }
 
-    onRedirect?.(targetUrl);
+    onRedirect?.(normalized.url);
 
-    // Differentiate between internal Next.js navigation and external URLs
-    const isInternalRoute = targetUrl.startsWith("/") && !targetUrl.startsWith("//");
-
-    if (isInternalRoute) {
-      router.push(targetUrl);
+    // Direct redirection: external URLs use window.location.assign, internal routes use Next.js router
+    if (normalized.isExternal) {
+      window.location.assign(normalized.url);
     } else {
-      window.location.href = targetUrl;
+      router.push(normalized.url);
     }
-  }, [targetUrl, router, onRedirect]);
+  }, [normalized, router, onRedirect]);
 
-  // Main tick effect
+  // Main countdown tick effect
   useEffect(() => {
     if (!isRunning || isPaused || isCancelled || isRedirecting) {
       if (intervalIdRef.current) {
@@ -67,8 +73,7 @@ export function useRedirectTimer({
     }
 
     lastTimestampRef.current = Date.now();
-
-    const TICK_INTERVAL = 50; // 50ms updates for smooth animations
+    const TICK_INTERVAL = 50; // 50ms updates for fluid progress bar
 
     intervalIdRef.current = setInterval(() => {
       const now = Date.now();
@@ -133,7 +138,6 @@ export function useRedirectTimer({
     executeRedirect();
   }, [executeRedirect]);
 
-  // Safe percentage bounded between 0 and 100
   const progressPercentage = Math.min(
     100,
     Math.max(0, ((totalDurationMs - remainingMs) / totalDurationMs) * 100)
@@ -145,6 +149,8 @@ export function useRedirectTimer({
     timeLeft,
     totalDuration: durationInSeconds,
     progressPercentage,
+    resolvedUrl: normalized.url,
+    isExternal: normalized.isExternal,
     isRunning,
     isPaused,
     isCancelled,

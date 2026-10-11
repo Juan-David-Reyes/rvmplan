@@ -1,6 +1,6 @@
 export interface RedirectLoaderProps {
   /**
-   * Target URL to redirect to (can be relative like '/dashboard' or absolute like 'https://google.com')
+   * Target URL to redirect to (can be relative like '/dashboard', domain like 'google.com', or absolute 'https://...')
    */
   targetUrl: string;
 
@@ -32,7 +32,7 @@ export interface RedirectLoaderProps {
   /**
    * Callback fired when redirection is triggered.
    */
-  onRedirect?: (url: string) => void;
+  onRedirect?: (resolvedUrl: string) => void;
 
   /**
    * Callback fired if user manually cancels the countdown.
@@ -44,7 +44,7 @@ export interface UseRedirectTimerOptions {
   targetUrl: string;
   durationInSeconds: number;
   autoStart?: boolean;
-  onRedirect?: (url: string) => void;
+  onRedirect?: (resolvedUrl: string) => void;
   onCancel?: () => void;
 }
 
@@ -52,6 +52,8 @@ export interface UseRedirectTimerReturn {
   timeLeft: number;
   totalDuration: number;
   progressPercentage: number;
+  resolvedUrl: string;
+  isExternal: boolean;
   isRunning: boolean;
   isPaused: boolean;
   isCancelled: boolean;

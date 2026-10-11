@@ -21,6 +21,8 @@ export function RedirectLoader({
   const {
     timeLeft,
     progressPercentage,
+    resolvedUrl,
+    isExternal,
     isPaused,
     isCancelled,
     isRedirecting,
@@ -37,7 +39,6 @@ export function RedirectLoader({
   });
 
   const strokeDashoffset = CIRCUMFERENCE - (CIRCUMFERENCE * progressPercentage) / 100;
-  const isInternal = targetUrl.startsWith("/") && !targetUrl.startsWith("//");
 
   return (
     <div
@@ -94,12 +95,12 @@ export function RedirectLoader({
         </div>
       </div>
 
-      {/* Target URL Pill */}
-      <div className={styles.targetUrlContainer} title={targetUrl}>
+      {/* Target URL Pill with normalized URL display */}
+      <div className={styles.targetUrlContainer} title={resolvedUrl}>
         <span className={styles.urlBadge}>
-          {isInternal ? "Ruta Local" : "Destino Web"}
+          {isExternal ? "Web Externa" : "Ruta Interna"}
         </span>
-        <span className={styles.urlText}>{targetUrl}</span>
+        <span className={styles.urlText}>{resolvedUrl}</span>
       </div>
 
       {/* Linear Progress Bar */}
@@ -200,7 +201,7 @@ export function RedirectLoader({
       {isRedirecting && (
         <div className={styles.statusNotice}>
           <span className={styles.statusSpinner} />
-          <span>Navegando a la nueva página...</span>
+          <span>Navegando a {resolvedUrl}...</span>
         </div>
       )}
     </div>
